@@ -1,0 +1,158 @@
+<?php
+
+/**
+ * @file
+ * Provides ability to rebuild node access silently.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function node_access_rebuild_progressive_menu() {
+  $items = array();
+
+  $items['admin/config/development/node-access-rebuild-progressive'] = array(
+    'title' => 'Node access rebuild',
+    'description' => t('Node access progressive rebuild settings.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('node_access_rebuild_progressive_admin_form'),
+    'access arguments' => array('administer site configuration'),
+  );
+
+  return $items;
+}
+
+/**
+ * Module settings form callback.
+ */
+function node_access_rebuild_progressive_admin_form() {
+  $form = array();
+
+  $form['node_access_rebuild_progressive_cron'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable progressive node access rebuild at cron time'),
+    '#description' => t('It is recommended that you run cron via drush for using this feature.'),
+    '#default_value' => variable_get('node_access_rebuild_progressive_cron', FALSE),
+  );
+
+  $form['node_access_rebuild_progressive_chunk'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Number of nodes to process in each chunk',
+    '#default_value' => variable_get('node_access_rebuild_progressive_chunk', 500),
+    '#description' => t('The number of nodes that will be processed per cron run. Make sure it can safely fit in memory, and in the cron run time if you are not running cron via drush.'),
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Validation callback.
+ */
+function node_access_rebuild_progressive_admin_form_validate($form, &$form_state) {
+  $chunk_size = $form_state['values']['node_access_rebuild_progressive_chunk'];
+  if (!is_numeric($chunk_size) || $chunk_size <= 0) {
+    form_set_error('node_access_rebuild_progressive_chunk', t('Chunk size must be a positive integer.'));
+  }
+}
+
+/**
+ * Implements hook_cron().
+ */
+function node_access_rebuild_progressive_cron() {
+  // Not enabled on cron, nothing to do.
+  if (!variable_get('node_access_rebuild_progressive_cron', FALSE)) {
+    return;
+  }
+  // Trigger the processing.
+  if (node_access_needs_rebuild()) {
+    node_access_rebuild_progressive_trigger();
+  }
+  // Process a batch of nodes if needed.
+  if (variable_get('node_access_rebuild_progressive_current', 0) > 0) {
+    node_access_rebuild_progressive_process_cron();
+  }
+}
+
+/**
+ * Initiate the full rebuild.
+ */
+function node_access_rebuild_progressive_trigger() {
+  // Prevents default message/behaviour.
+  node_access_needs_rebuild(FALSE);
+  // Add default grants in the unlikely case
+  // no modules implement node_grants anymore.
+  if (!count(module_implements('node_grants'))) {
+    node_access_rebuild_progressive_set_default();
+    return node_access_rebuild_progressive_finished();
+  }
+  // Clean up possible mismatches.
+  db_query("DELETE FROM {node_access} WHERE nid NOT IN (SELECT nid FROM {node})");
+  // We only need the current one, nodes created afterward would get processed
+  // at save time.
+  $highest = db_query("SELECT nid FROM {node} ORDER BY nid DESC LIMIT 0,1")->fetchField();
+  $count = db_query("SELECT count(nid) FROM {node}")->fetchField();
+  variable_set('node_access_rebuild_progressive_current', $highest + 1);
+  watchdog('node_access_rebuild_progressive', '%count nodes queued for node access rebuild.', array('%count' => $count), WATCHDOG_NOTICE);
+}
+
+function node_access_rebuild_progressive_set_default() {
+  db_truncate('node_access')->execute();
+  db_insert('node_access')
+      ->fields(array(
+        'nid' => 0,
+        'realm' => 'all',
+        'gid' => 0,
+        'grant_view' => 1,
+        'grant_update' => 0,
+        'grant_delete' => 0,
+      ))
+      ->execute();
+}
+
+/**
+ * Processes a chunk of nodes at cron run.
+ */
+function node_access_rebuild_progressive_process_cron() {
+  $pass = node_access_rebuild_progressive_process_chunk();
+  if (empty($pass['total'])) {
+    return node_access_rebuild_progressive_finished();
+  }
+}
+
+/**
+ * Processes a chunk of nodes.
+ * @return array
+ *   An array with the following keys:
+ *   - total: the number of nodes retrieved for processing.
+ *   - processed: the number of nodes actually processed.
+ */
+function node_access_rebuild_progressive_process_chunk() {
+  $current = variable_get('node_access_rebuild_progressive_current', 0);
+  $chunk_size = (int) variable_get('node_access_rebuild_progressive_chunk', 500);
+  $nids = db_query("SELECT nid FROM {node} WHERE nid < :current ORDER BY nid DESC LIMIT 0,$chunk_size", array(':current' => $current))->fetchCol();
+  $total = count($nids);
+  $processed = 0;
+  if ($total) {
+    $nodes = node_load_multiple($nids);
+    foreach ($nodes as $node) {
+      // Make sure the node can be loaded properly.
+      if (!empty($node->nid)) {
+        node_access_acquire_grants($node);
+        $current = $node->nid;
+        $processed ++;
+      }
+    }
+    variable_set('node_access_rebuild_progressive_current', $current);
+  }
+  return array(
+    'total' => $total,
+    'processed' => $processed,
+  );
+}
+
+/**
+ * Cleanup after queue completion.
+ */
+function node_access_rebuild_progressive_finished() {
+  variable_set('node_access_rebuild_progressive_current', 0);
+  watchdog('node_access_rebuild_progressive', 'Node access rebuild finished.', NULL, WATCHDOG_NOTICE);
+}

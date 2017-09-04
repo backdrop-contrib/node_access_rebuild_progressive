@@ -1,0 +1,3 @@
+name = Node Access Rebuild Progressive
+description = "Rebuild node access grants in chunks"
+core = 7.x
