@@ -13,7 +13,7 @@ function node_access_rebuild_progressive_menu() {
 
   $items['admin/config/development/node-access-rebuild-progressive'] = array(
     'title' => 'Node access rebuild',
-    'description' => t('Node access progressive rebuild settings.'),
+    'description' => 'Node access progressive rebuild settings.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('node_access_rebuild_progressive_admin_form'),
     'access arguments' => array('administer site configuration'),
@@ -94,18 +94,21 @@ function node_access_rebuild_progressive_trigger() {
   watchdog('node_access_rebuild_progressive', '%count nodes queued for node access rebuild.', array('%count' => $count), WATCHDOG_NOTICE);
 }
 
+/**
+ * Rebuilds defaults access rights.
+ */
 function node_access_rebuild_progressive_set_default() {
   db_truncate('node_access')->execute();
   db_insert('node_access')
-      ->fields(array(
-        'nid' => 0,
-        'realm' => 'all',
-        'gid' => 0,
-        'grant_view' => 1,
-        'grant_update' => 0,
-        'grant_delete' => 0,
-      ))
-      ->execute();
+    ->fields(array(
+      'nid' => 0,
+      'realm' => 'all',
+      'gid' => 0,
+      'grant_view' => 1,
+      'grant_update' => 0,
+      'grant_delete' => 0,
+    ))
+    ->execute();
 }
 
 /**
@@ -120,6 +123,7 @@ function node_access_rebuild_progressive_process_cron() {
 
 /**
  * Processes a chunk of nodes.
+ *
  * @return array
  *   An array with the following keys:
  *   - total: the number of nodes retrieved for processing.
@@ -132,13 +136,13 @@ function node_access_rebuild_progressive_process_chunk() {
   $total = count($nids);
   $processed = 0;
   if ($total) {
-    $nodes = node_load_multiple($nids);
+    $nodes = node_load_multiple($nids, array(), TRUE);
     foreach ($nodes as $node) {
       // Make sure the node can be loaded properly.
       if (!empty($node->nid)) {
         node_access_acquire_grants($node);
         $current = $node->nid;
-        $processed ++;
+        $processed++;
       }
     }
     variable_set('node_access_rebuild_progressive_current', $current);
