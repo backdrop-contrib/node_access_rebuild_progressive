@@ -1,7 +1,12 @@
 <?php
 
 /**
- * Implements of hook_drush_command().
+ * @file
+ * Defines the node access rebuild command.
+ */
+
+/**
+ * Implements hook_drush_command().
  */
 function node_access_rebuild_progressive_drush_command() {
 
@@ -18,39 +23,38 @@ function node_access_rebuild_progressive_drush_command() {
  */
 function drush_node_access_rebuild_progressive_rebuild() {
   node_access_rebuild_progressive_trigger();
-  $batch_def = array(
-    'title' => t('Node access rebuild'),
-    'operations' => array(
-      array('node_access_rebuild_progressive_process_drush', array()),
-    ),
-    'file' => 'node_access_rebuild_progressive.drush.inc',
-    'finished' => 'node_access_rebuild_progressive_finished',
-  );
-
-  batch_set($batch_def);
-  $batch = & batch_get();
-  $batch['progressive'] = FALSE;
-  drush_backend_batch_process();
+  $finished = FALSE;
+  $total = db_query("SELECT count(nid) FROM {node}")->fetchField();
+  $processed = 0;
+  while (!$finished) {
+    $cmd = '_drush_node_access_rebuild_progressive_process(' . $total . ',' . $processed . ');';
+    $data = drush_invoke_process('@self', 'php-eval', [$cmd]);
+    $processed = $data['context']['_drush_node_access_rebuild_progressive_processed'];
+    $finished = drush_get_error() || !$data || (isset($data['context']['_drush_node_access_rebuild_progressive_finished']) && $data['context']['_drush_node_access_rebuild_progressive_finished'] === TRUE);
+  }
 }
 
-function node_access_rebuild_progressive_process_drush(&$context) {
-  if (!isset($context['sandbox']['total'])) {
-    $context['sandbox']['total'] = 0;
-    $context['sandbox']['processed'] = 0;
-    $context['sandbox']['nodes'] = db_query("SELECT count(nid) FROM {node}")->fetchField();
-  }
+/**
+ * Processes a pass of nodes.
+ *
+ * @param int $total
+ *   Number of nodes to process.
+ * @param int $processed
+ *   Number of nodes processed.
+ */
+function _drush_node_access_rebuild_progressive_process(int $total, int $processed) {
   $pass = node_access_rebuild_progressive_process_chunk();
-  $context['sandbox']['total'] += $pass['total'];
-  $context['sandbox']['processed'] += $pass['processed'];
-  $numbers = array(
-    '@processed' => $pass['total'],
-    '@total' => $pass['processed'],
-    '@grand_processed' => $context['sandbox']['processed'],
-    '@grand_total' => $context['sandbox']['total'],
-    '@nodes' => $context['sandbox']['nodes'],
-  );
-  $context['finished'] = empty($pass['total']) ? 1 : 0;
-  if (!$context['finished']) {
-    drush_print(dt('Processed @processed of @total nodes - Total: @grand_processed/@grand_total (@nodes)', $numbers));
+  $processed += $pass['processed'];
+  drush_set_option('_drush_node_access_rebuild_progressive_processed', $processed);
+  $figures = [
+    '@pass' => $pass['processed'],
+    '@nodes' => $pass['total'],
+    '@processed' => $processed,
+    '@total' => $total,
+  ];
+  if (empty($pass['total'])) {
+    drush_set_option('_drush_node_access_rebuild_progressive_finished', TRUE);
+    return;
   }
+  drush_print(dt('Processed @pass of @nodes nodes (@processed/@total).', $figures));
 }

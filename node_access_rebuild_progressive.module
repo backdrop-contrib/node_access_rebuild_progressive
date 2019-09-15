@@ -91,7 +91,7 @@ function node_access_rebuild_progressive_trigger() {
   $highest = db_query("SELECT nid FROM {node} ORDER BY nid DESC LIMIT 0,1")->fetchField();
   $count = db_query("SELECT count(nid) FROM {node}")->fetchField();
   variable_set('node_access_rebuild_progressive_current', $highest + 1);
-  watchdog('node_access_rebuild_progressive', '%count nodes queued for node access rebuild.', array('%count' => $count), WATCHDOG_NOTICE);
+  watchdog('node_access_rebuild_progressive', '%count nodes queued for node access rebuild.', array('%count' => $count), WATCHDOG_INFO);
 }
 
 /**
