@@ -160,3 +160,15 @@ function node_access_rebuild_progressive_finished() {
   variable_set('node_access_rebuild_progressive_current', 0);
   watchdog('node_access_rebuild_progressive', 'Node access rebuild finished.', NULL, WATCHDOG_NOTICE);
 }
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function node_access_rebuild_progressive_form_node_configure_rebuild_confirm_alter(&$form, &$form_state, $form_id) {
+  $form['description']['#markup'] = t('<p>This form has been disabled by the node_access_rebuild_progressive module.</p>');
+  $form['description']['#markup'] .= t('<p>You can manually rebuild the permissions using Drush: <strong>drush node-access-rebuild-progressive</strong>.</p>');
+  if (variable_get('node_access_rebuild_progressive_cron', FALSE) === TRUE) {
+    $form['description']['#markup'] .= t('<p>Else they will be rebuilt incrementally during Drupal cron run.</p>');
+  }
+  $form['#disabled'] = TRUE;
+}
