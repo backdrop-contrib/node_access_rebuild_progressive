@@ -1,0 +1,5 @@
+{
+  "_config_name": "node_access_rebuild_progressive.settings",
+  "cron": false,
+  "chunk": 500
+}
