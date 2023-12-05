@@ -37,7 +37,9 @@ complete text.
 
 ## Maintainers
 
-* Seeking co-maintainers.
+- [Robert J. Lang](https://github.com/bugfolder).
+
+Additional maintainers are welcome.
 
 ## Credit
 
