@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Provides ability to rebuild node access silently.
