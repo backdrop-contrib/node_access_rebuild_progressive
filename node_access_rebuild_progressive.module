@@ -47,7 +47,7 @@ function node_access_rebuild_progressive_admin_form() {
     '#default_value' => $config->get('cron'),
   );
 
-  $form['node_access_rebuild_progressive_chunk'] = array(
+  $form['chunk'] = array(
     '#type' => 'textfield',
     '#title' => 'Number of nodes to process in each chunk',
     '#default_value' => $config->get('chunk'),
@@ -60,9 +60,9 @@ function node_access_rebuild_progressive_admin_form() {
  * Validation callback.
  */
 function node_access_rebuild_progressive_admin_form_validate($form, &$form_state) {
-  $chunk_size = $form_state['values']['node_access_rebuild_progressive_chunk'];
+  $chunk_size = $form_state['values']['chunk'];
   if (!is_numeric($chunk_size) || $chunk_size <= 0) {
-    form_set_error('node_access_rebuild_progressive_chunk', t('Chunk size must be a positive integer.'));
+    form_set_error('chunk', t('Chunk size must be a positive integer.'));
   }
 }
 
