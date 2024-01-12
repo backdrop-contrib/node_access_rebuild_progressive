@@ -1,5 +1,5 @@
 name = Node Access Rebuild Progressive
-description = "Rebuild node access grants in chunks"
+description = "Rebuild node access grants in chunks."
 backdrop = 1.x
 type = module
 
