@@ -43,7 +43,7 @@ function node_access_rebuild_progressive_admin_form() {
   $form['cron'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable progressive node access rebuild at cron time'),
-    '#description' => t('It is recommended that you run cron via drush for using this feature.'),
+    '#description' => t('It is recommended that you run cron via bee or drush for using this feature.'),
     '#default_value' => $config->get('cron'),
   );
 
@@ -51,7 +51,7 @@ function node_access_rebuild_progressive_admin_form() {
     '#type' => 'textfield',
     '#title' => 'Number of nodes to process in each chunk',
     '#default_value' => $config->get('chunk'),
-    '#description' => t('The number of nodes that will be processed per cron run. Make sure it can safely fit in memory, and in the cron run time if you are not running cron via drush.'),
+    '#description' => t('The number of nodes that will be processed per cron run. Make sure it can safely fit in memory, and in the cron run time if you are not running cron via bee or drush.'),
   );
   return system_settings_form($form);
 }
@@ -90,15 +90,15 @@ function node_access_rebuild_progressive_cron() {
 function node_access_rebuild_progressive_trigger() {
   // Prevents default message/behaviour.
   node_access_needs_rebuild(FALSE);
-  // Add default grants in the unlikely case
-  // no modules implement node_grants anymore.
+  // Add default grants in the unlikely case no modules implement node_grants
+  // anymore.
   if (!count(module_implements('node_grants'))) {
     node_access_rebuild_progressive_set_default();
     return node_access_rebuild_progressive_finished();
   }
   // Clean up possible mismatches.
   db_query("DELETE FROM {node_access} WHERE nid NOT IN (SELECT nid FROM {node})");
-  // We only need the current one, nodes created afterward would get processed
+  // We only need the current one; nodes created afterward would get processed
   // at save time.
   $highest = db_query("SELECT nid FROM {node} ORDER BY nid DESC LIMIT 0,1")->fetchField();
   $count = db_query("SELECT count(nid) FROM {node}")->fetchField();
@@ -177,10 +177,15 @@ function node_access_rebuild_progressive_finished() {
  * Implements hook_form_FORM_ID_alter().
  */
 function node_access_rebuild_progressive_form_node_configure_rebuild_confirm_alter(&$form, &$form_state, $form_id) {
-  $form['description']['#markup'] = t('<p>This form has been disabled by the node_access_rebuild_progressive module.</p>');
-  $form['description']['#markup'] .= t('<p>You can manually rebuild the permissions using Drush: <strong>drush node-access-rebuild-progressive</strong>.</p>');
+  $form['description']['#markup'] = t('<p>This form has been disabled by the Node Access Rebuild Progressive module.</p>');
+  $form['description']['#markup'] .= t('<p>You can manually rebuild the permissions using bee or drush:</p>');
+  $form['description']['#markup'] .= theme('item_list', array('items' => array(
+    '<strong>bee node-access-rebuild-progressive</strong> or',
+    '<strong>bee narp</strong> or',
+    '<strong>drush node-access-rebuild-progressive</strong>',
+  )));
   if (state_get('node_access_rebuild_progressive_cron', FALSE) == TRUE) {
-    $form['description']['#markup'] .= t('<p>Else they will be rebuilt incrementally during Backdrop cron run.</p>');
+    $form['description']['#markup'] .= t('<p>Otherwise they will be rebuilt incrementally during the Backdrop cron run.</p>');
   }
   $form['#disabled'] = TRUE;
 }
